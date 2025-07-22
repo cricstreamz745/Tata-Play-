@@ -30,6 +30,8 @@
       height: 100%;
       background-color: rgba(0, 0, 0, 0.8);
       font-size: 24px;
+      text-align: center;
+      padding: 20px;
     }
   </style>
   <script src="https://content.jwplatform.com/libraries/SAHhwvZq.js"></script>
@@ -40,9 +42,9 @@
   <script>
     jwplayer.key = 'XSuP4qMl+9tK17QNb+4+th2Pm9AWgMO/cYH8CI0HGGr7bdjo';
 
-    // Inject token into XHR
+    // Inject DRM token into all XHR calls
     const tokenParam = "__hdnea__=st=1753150687~exp=1753237087~acl=/*~hmac=e451d81825fa62ca69511cf56c606e15ccc99db875e6dbe5f8f7c72b96865936";
-    (function() {
+    (() => {
       const origOpen = XMLHttpRequest.prototype.open;
       XMLHttpRequest.prototype.open = function(method, url) {
         if (url && !url.includes("__hdnea__")) {
@@ -52,60 +54,67 @@
       };
     })();
 
-    // Decode base64 JSON from query param
-    function getChannelData() {
-      const params = new URLSearchParams(window.location.search);
-      const encoded = params.get('data');
-      if (!encoded) return null;
+    async function getChannelAndPlay() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const channelName = urlParams.get('channel');
+      if (!channelName) {
+        return showError("No channel specified.");
+      }
+
       try {
-        return JSON.parse(decodeURIComponent(escape(atob(encoded))));
-      } catch (e) {
-        console.error("Invalid channel data");
-        return null;
+        const res = await fetch("https://allinonereborn.fun/jstrweb2/index.php");
+        const channels = await res.json();
+        const ch = channels.find(c => c.name.toLowerCase() === channelName.toLowerCase());
+
+        if (!ch) return showError("Channel not found: " + channelName);
+
+        const fullUrl = `${ch.mpd}?${ch.token}`;
+        const drmKeyId = Object.keys(ch.drm)[0];
+        const drmKey = ch.drm[drmKeyId];
+
+        jwplayer("player").setup({
+          playlist: [{
+            title: ch.name,
+            image: ch.logo,
+            file: fullUrl,
+            drm: {
+              clearkey: {
+                keyId: drmKeyId,
+                key: drmKey,
+                robustness: {
+                  video: "SW_SECURE_DECODE",
+                  audio: "SW_SECURE_DECODE"
+                }
+              }
+            }
+          }],
+          width: "100%",
+          height: "100%",
+          autostart: true,
+          mute: false,
+          primary: "html5",
+          hlshtml: true,
+          aspectratio: "16:9",
+          stretching: "uniform",
+          playbackRateControls: true,
+          controls: true
+        }).on("error", e => {
+          showError("Player error: " + (e.message || "Unknown"));
+        });
+
+      } catch (err) {
+        showError("Failed to fetch channels or play: " + err.message);
       }
     }
 
-    const ch = getChannelData();
-    if (!ch) {
-      document.body.innerHTML = '<div id="message">Invalid channel data</div>';
-    } else {
-      const fullUrl = `${ch.mpd}?${ch.token}`;
-      const drmKeyId = Object.keys(ch.drm)[0];
-      const drmKey = ch.drm[drmKeyId];
-
-      jwplayer("player").setup({
-        playlist: [{
-          title: ch.name,
-          image: ch.logo,
-          file: fullUrl,
-          drm: {
-            clearkey: {
-              keyId: drmKeyId,
-              key: drmKey,
-              robustness: {
-                video: "SW_SECURE_DECODE",
-                audio: "SW_SECURE_DECODE"
-              }
-            }
-          }
-        }],
-        width: "100%",
-        height: "100%",
-        autostart: true,
-        mute: false,
-        primary: "html5",
-        hlshtml: true,
-        aspectratio: "16:9",
-        stretching: "uniform",
-        playbackRateControls: true,
-        controls: true
-      }).on("error", e => {
-        const msg = document.createElement('div');
-        msg.id = "message";
-        msg.innerText = "Player error: " + (e.message || "Unknown error");
-        document.body.appendChild(msg);
-      });
+    function showError(msg) {
+      const el = document.createElement('div');
+      el.id = "message";
+      el.innerText = msg;
+      document.body.appendChild(el);
     }
+
+    getChannelAndPlay();
   </script>
 </body>
 </html>
