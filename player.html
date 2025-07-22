@@ -2,22 +2,98 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <title>Shaka Player</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Player</title>
-  <link rel="icon" href="https://www.jiotv.com/favicon.ico">
+  <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.ui.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/controls.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
-    body {
-      margin: 0;
-      background-color: #000;
+    html, body { margin: 0; padding: 0; background: #000; height: 100%; overflow: hidden; }
+    #video-container { width: 100%; height: 100%; position: relative; }
+    video { width: 100%; height: 100%; background: #000; }
+
+    #overlay-image {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      transform: translate(-50%, -50%);
+      object-fit: cover;
+      z-index: 5;
+    }
+
+    .shaka-controls-container { z-index: 10 !important; }
+    .shaka-play-button { z-index: 15 !important; }
+
+    /* PREMIUM MENU STYLES */
+    .shaka-settings-menu {
+      background: rgba(30, 30, 30, 0.6) !important;
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(255,255,255,0.2);
+      padding: 8px 10px;
+      border: 1px solid rgba(255,255,255,0.15);
+      max-width: 220px;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .shaka-settings-menu button {
+      display: block;
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      color: #fff;
+      border-radius: 8px;
+      padding: 6px 12px;
+      margin: 4px 0;
+      border: 2px solid rgba(255,255,255,0.35);
+      font-size: 13px;
+      transition: all 0.3s ease;
+      position: relative;
       overflow: hidden;
     }
-    .jwplayer {
-      position: absolute !important;
+
+    .shaka-settings-menu button::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(135deg, rgba(0,198,255,0.12), rgba(0,114,255,0.12));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      border-radius: 8px;
+      z-index: 0;
     }
-    .jwplayer.jw-flag-aspect-mode {
-      min-height: 100%;
-      max-height: 100%;
+
+    .shaka-settings-menu button:hover::before,
+    .shaka-settings-menu button:focus::before {
+      opacity: 1;
     }
+
+    .shaka-settings-menu button:hover,
+    .shaka-settings-menu button:focus {
+      border-color: #fff;
+      box-shadow: 0 0 10px rgba(0, 198, 255, 0.5);
+      color: #fff;
+    }
+
+    .shaka-settings-menu button[aria-checked="true"] {
+      background: linear-gradient(135deg, #00c6ff, #0072ff);
+      color: #fff;
+      border-color: #fff;
+      box-shadow: 0 0 12px rgba(0, 198, 255, 0.7);
+    }
+
+    .shaka-settings-menu button:focus {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
     #message {
       color: #fff;
       display: flex;
@@ -34,78 +110,16 @@
       padding: 20px;
     }
   </style>
-  <script src="https://content.jwplatform.com/libraries/SAHhwvZq.js"></script>
 </head>
 <body>
-  <div id="player"></div>
+  <div id="video-container">
+    <video id="video" class="shaka-video" autoplay muted></video>
+    <img id="overlay-image" src="https://i.ibb.co/S7f2pn1J/Vmake1751392937878.png" alt="overlay">
+    <div class="shaka-controls-container" shaka-controls></div>
+  </div>
 
   <script>
-    jwplayer.key = 'XSuP4qMl+9tK17QNb+4+th2Pm9AWgMO/cYH8CI0HGGr7bdjo';
-
-    // Inject DRM token into all XHR calls
     const tokenParam = "__hdnea__=st=1753150687~exp=1753237087~acl=/*~hmac=e451d81825fa62ca69511cf56c606e15ccc99db875e6dbe5f8f7c72b96865936";
-    (() => {
-      const origOpen = XMLHttpRequest.prototype.open;
-      XMLHttpRequest.prototype.open = function(method, url) {
-        if (url && !url.includes("__hdnea__")) {
-          url += (url.includes('?') ? '&' : '?') + tokenParam;
-        }
-        return origOpen.apply(this, arguments);
-      };
-    })();
-
-    async function getChannelAndPlay() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const channelName = urlParams.get('channel');
-      if (!channelName) {
-        return showError("No channel specified.");
-      }
-
-      try {
-        const res = await fetch("https://allinonereborn.fun/jstrweb2/index.php");
-        const channels = await res.json();
-        const ch = channels.find(c => c.name.toLowerCase() === channelName.toLowerCase());
-
-        if (!ch) return showError("Channel not found: " + channelName);
-
-        const fullUrl = `${ch.mpd}?${ch.token}`;
-        const drmKeyId = Object.keys(ch.drm)[0];
-        const drmKey = ch.drm[drmKeyId];
-
-        jwplayer("player").setup({
-          playlist: [{
-            title: ch.name,
-            image: ch.logo,
-            file: fullUrl,
-            drm: {
-              clearkey: {
-                keyId: drmKeyId,
-                key: drmKey,
-                robustness: {
-                  video: "SW_SECURE_DECODE",
-                  audio: "SW_SECURE_DECODE"
-                }
-              }
-            }
-          }],
-          width: "100%",
-          height: "100%",
-          autostart: true,
-          mute: false,
-          primary: "html5",
-          hlshtml: true,
-          aspectratio: "16:9",
-          stretching: "uniform",
-          playbackRateControls: true,
-          controls: true
-        }).on("error", e => {
-          showError("Player error: " + (e.message || "Unknown"));
-        });
-
-      } catch (err) {
-        showError("Failed to fetch channels or play: " + err.message);
-      }
-    }
 
     function showError(msg) {
       const el = document.createElement('div');
@@ -114,7 +128,54 @@
       document.body.appendChild(el);
     }
 
-    getChannelAndPlay();
+    document.addEventListener('DOMContentLoaded', async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const channelName = urlParams.get('channel');
+      if (!channelName) return showError("❌ No channel specified in URL.");
+
+      try {
+        const res = await fetch("https://allinonereborn.fun/jstrweb2/index.php");
+        const channels = await res.json();
+        const ch = channels.find(c => c.name.toLowerCase() === channelName.toLowerCase());
+
+        if (!ch) return showError("❌ Channel not found: " + channelName);
+
+        const video = document.getElementById('video');
+        const container = document.getElementById('video-container');
+        const overlayImage = document.getElementById('overlay-image');
+        const player = new shaka.Player(video);
+        const ui = new shaka.ui.Overlay(player, container, video);
+
+        ui.configure({
+          controlPanelElements: [
+            'play_pause', 'rewind', 'fast_forward', 'time_and_duration',
+            'spacer', 'mute', 'volume', 'captions', 'quality', 'playback_rate',
+            'cast', 'loop', 'fullscreen'
+          ],
+          enableQualitySelection: true
+        });
+
+        player.configure({
+          drm: {
+            clearKeys: ch.drm
+          }
+        });
+
+        const fullUrl = `${ch.mpd}?${ch.token}&${tokenParam}`;
+        await player.load(fullUrl);
+
+        console.log("✅ Playing:", ch.name);
+        video.addEventListener('playing', () => {
+          overlayImage?.remove();
+        });
+
+        player.addEventListener('error', e => {
+          showError("❌ Player error: " + (e.detail?.message || e.detail || "Unknown"));
+        });
+      } catch (err) {
+        showError("❌ Failed to load channel: " + err.message);
+      }
+    });
   </script>
 </body>
 </html>
