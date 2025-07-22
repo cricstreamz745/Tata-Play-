@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>JioTV Live Channels</title>
+  <link rel="icon" href="https://www.jiotv.com/favicon.ico" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #0f172a;
+      color: white;
+      font-family: sans-serif;
+    }
+    .channel-card {
+      @apply flex items-center bg-gray-800 hover:bg-gray-700 rounded-lg p-4 shadow-md transition duration-200;
+    }
+    .channel-logo {
+      width: 60px;
+      height: 60px;
+      object-fit: contain;
+      background: #1e293b;
+      border-radius: 8px;
+    }
+    .btn {
+      @apply bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded;
+    }
+  </style>
+</head>
+<body class="p-4">
+  <h1 class="text-3xl font-bold text-center mb-6">📺 JioTV Live Channels (DRM)</h1>
+  <div id="channelList" class="space-y-4 max-w-4xl mx-auto">
+    <p>Loading channels...</p>
+  </div>
+
+  <script>
+    async function fetchChannels() {
+      const list = document.getElementById('channelList');
+      try {
+        const res = await fetch("https://allinonereborn.fun/jstrweb2/index.php");
+        const data = await res.json();
+
+        list.innerHTML = '';
+        data.forEach(ch => {
+          const div = document.createElement('div');
+          div.className = 'channel-card';
+
+          div.innerHTML = `
+            <img src="${ch.logo}" class="channel-logo mr-4" alt="${ch.name}" />
+            <div class="flex-1">
+              <div class="text-xl font-semibold">${ch.name}</div>
+              <div class="text-sm text-gray-400">${ch.category}</div>
+            </div>
+            <button class="btn">▶️ Play</button>
+          `;
+
+          div.querySelector('button').addEventListener('click', () => {
+            window.location.href = `player.html?id=${encodeURIComponent(ch.id)}`;
+          });
+
+          list.appendChild(div);
+        });
+      } catch (err) {
+        console.error("Failed to load:", err);
+        list.innerHTML = '<p class="text-red-500">Failed to load channel list.</p>';
+      }
+    }
+
+    fetchChannels();
+  </script>
+</body>
+</html>
