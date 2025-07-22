@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Now Playing - JioTV</title>
+  <link rel="icon" href="https://www.jiotv.com/favicon.ico" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://content.jwplatform.com/libraries/SAHhwvZq.js"></script>
+  <style>
+    body {
+      background-color: #0f172a;
+      color: white;
+      font-family: sans-serif;
+    }
+    #player {
+      width: 100%;
+      max-width: 90vw;
+      height: 80vh;
+      margin: auto;
+      border-radius: 12px;
+    }
+    #backBtn {
+      @apply bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded mt-4 mx-auto block;
+    }
+  </style>
+</head>
+<body class="p-4 text-center">
+  <h1 class="text-2xl font-bold mb-4">📺 Now Playing</h1>
+  <div id="player"></div>
+  <a id="backBtn" href="index.html">⬅️ Back to Channels</a>
+
+  <script>
+    jwplayer.key = 'XSuP4qMl+9tK17QNb+4+th2Pm9AWgMO/cYH8CI0HGGr7bdjo';
+
+    const tokenParam = "__hdnea__=st=1752546011~exp=1752632411~acl=/*~hmac=dc23b19e23c0f63d84b28debe92ce57886bda0d94662e24c6e8bd1939c0c4910";
+
+    const origOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url) {
+      if (url && !url.includes("__hdnea__")) {
+        url += (url.includes('?') ? '&' : '?') + tokenParam;
+      }
+      return origOpen.apply(this, arguments);
+    };
+
+    async function fetchAndPlay() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const channelId = urlParams.get('id');
+      if (!channelId) return alert("Invalid channel ID!");
+
+      try {
+        const res = await fetch("https://allinonereborn.fun/jstrweb2/index.php");
+        const channels = await res.json();
+        const channel = channels.find(ch => ch.id === channelId);
+        if (!channel) return alert("Channel not found!");
+
+        const fullUrl = `${channel.mpd}?${channel.token}`;
+        const drmKeyId = Object.keys(channel.drm)[0];
+        const drmKey = channel.drm[drmKeyId];
+
+        jwplayer("player").setup({
+          playlist: [{
+            title: channel.name,
+            image: channel.logo,
+            file: fullUrl,
+            drm: {
+              clearkey: {
+                keyId: drmKeyId,
+                key: drmKey,
+                robustness: {
+                  video: "SW_SECURE_DECODE",
+                  audio: "SW_SECURE_DECODE"
+                }
+              }
+            }
+          }],
+          width: "100%",
+          height: "100%",
+          autostart: true,
+          mute: false,
+          primary: "html5",
+          hlshtml: true,
+          aspectratio: "16:9",
+          stretching: "uniform",
+          playbackRateControls: true,
+          controls: true
+        });
+      } catch (err) {
+        console.error("Error loading stream:", err);
+        alert("Failed to load stream.");
+      }
+    }
+
+    fetchAndPlay();
+  </script>
+</body>
+</html>
